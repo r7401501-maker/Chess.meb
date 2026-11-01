@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>Chess.meb</title>
+<meta name="theme-color" content="#2b2118">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.js"></script>
+<script src="sound.js"></script>
+<script src="pool.js"></script>
+<style>
+:root{--bg:var(--tg-theme-bg-color,#fff);--tx:var(--tg-theme-text-color,#111);--hint:var(--tg-theme-hint-color,#777);--btn:var(--tg-theme-button-color,#2f7fd8);--btx:var(--tg-theme-button-text-color,#fff);--card:var(--tg-theme-secondary-bg-color,#f0f0f3);--l:#f0d9b5;--d:#b58863;--sq:min(100vw - 16px,480px);color-scheme:light dark}
+@media(prefers-color-scheme:dark){:root{--bg:var(--tg-theme-bg-color,#17181c);--tx:var(--tg-theme-text-color,#eee);--card:var(--tg-theme-secondary-bg-color,#25272d)}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif}
+#app{padding:8px 8px calc(12px + env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center;gap:8px;min-height:100vh}
+#app>*{width:var(--sq)}
+.top,.pl,.it{display:flex;align-items:center;gap:10px}
+.pl,.it{background:var(--card);border-radius:12px;padding:7px 10px}
+.it{margin-bottom:6px}
+.av{width:38px;height:38px;border-radius:50%;background:var(--btn);color:var(--btx);display:grid;place-items:center;font-weight:700;font-size:18px;overflow:hidden;flex:none}
+.av img{width:100%;height:100%;object-fit:cover}
+.n{flex:1;min-width:0}.n b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.n small{color:var(--hint)}
+.rk{width:26px;text-align:center;color:var(--hint);font-weight:700;flex:none}
+.me{outline:2px solid var(--btn)}
+.row{display:flex;gap:6px}
+button{flex:1;border:0;border-radius:10px;padding:11px 6px;background:var(--card);color:var(--tx);font:inherit;font-weight:600}
+button.pri,.tabs button.on{background:var(--btn);color:var(--btx)}
+button:disabled{opacity:.4}
+.it button{flex:none;padding:8px 12px}
+button:focus-visible{outline:2px solid var(--btn);outline-offset:2px}
+h4{margin:6px 2px;color:var(--hint);font-weight:600;font-size:13px}
+.ban{background:var(--card);border-radius:12px;padding:10px;text-align:center}
+.ban .row{margin-top:8px}
+label.rt{display:flex;gap:8px;align-items:center;margin:4px 2px}
+#bd{height:var(--sq);display:grid;grid-template:repeat(8,1fr)/repeat(8,1fr);border-radius:6px;overflow:hidden;touch-action:manipulation;user-select:none}
+.sq{position:relative;display:grid;place-items:center;font-size:calc(var(--sq)/8*.78);line-height:1}
+.sq.l{background:var(--l)}.sq.d{background:var(--d)}
+.sq.lm::before,.sq.sel::before{content:"";position:absolute;inset:0}
+.sq.lm::before{background:rgba(255,215,0,.38)}
+.sq.sel::before{background:rgba(70,150,255,.5)}
+.sq.mv::after,.sq.cp::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+.sq.mv::after{width:30%;height:30%;border-radius:50%;background:rgba(0,0,0,.3)}
+.sq.cp::after{width:92%;height:92%;border-radius:50%;box-shadow:inset 0 0 0 4px rgba(0,0,0,.3)}
+.p{font-style:normal;position:relative;z-index:1}
+.p.w{color:#fff;text-shadow:0 0 2px #000,0 0 2px #000,0 1px 3px #000}
+.p.b{color:#151515;text-shadow:0 0 1px rgba(255,255,255,.6)}
+.ck{position:relative;z-index:1;width:76%;height:76%;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:.5em}
+.ck.w{background:radial-gradient(circle at 35% 35%,#fff,#d9d2c4);border:3px solid #b9ad95;color:#8a6d00}
+.ck.b{background:radial-gradient(circle at 35% 35%,#666,#1b1b1b);border:3px solid #000;color:#ffd24a}
+.ck.k::after{content:"♛\FE0E"}
+#st{text-align:center;color:var(--hint);min-height:20px}
+#mv{display:flex;flex-wrap:wrap;gap:4px 8px;max-height:96px;overflow:auto;background:var(--card);border-radius:12px;padding:8px 10px;min-height:38px}
+#mv span{padding:1px 5px;border-radius:5px}
+#mv span.cur{background:var(--btn);color:var(--btx)}
+#mv em{font-style:normal;color:var(--hint)}
+.p.o.w{color:#151515;text-shadow:none}
+.p.col.w{color:#ffd24a;text-shadow:0 0 2px #5a3c00,0 1px 3px #000}
+.p.col.b{color:#1f4fa3;text-shadow:0 0 1px #fff,0 0 3px #fff}
+.p.let{display:grid;place-items:center;width:78%;height:78%;border-radius:50%;font:700 .55em system-ui,sans-serif;border:2px solid #151515}
+.p.let.w{background:#fff;color:#151515;text-shadow:none}
+.p.let.b{background:#2a2a2e;color:#fff;border-color:#fff;text-shadow:none}
+.sq.chk::before{content:"";position:absolute;inset:0;background:radial-gradient(circle,rgba(255,40,40,.9),transparent 70%);animation:pulse 1.1s ease-in-out infinite}
+.sq.sel .p,.sq.sel .ck{transform:scale(1.14);transition:transform .12s}
+.sq.mv::after,.sq.cp::after{animation:fade .2s ease-out}
+.sq.burst::after{content:"";position:absolute;inset:0;border-radius:50%;background:rgba(255,80,60,.55);animation:burst .45s ease-out forwards}
+@keyframes pulse{50%{opacity:.4}}
+@keyframes fade{from{opacity:0}}
+@keyframes burst{from{transform:scale(.3);opacity:.9}to{transform:scale(1.6);opacity:0}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+#app>.ov{position:fixed;inset:0;width:100%;background:rgba(0,0,0,.5);display:grid;place-items:center;z-index:20}
+.box{background:var(--bg);border-radius:16px;padding:16px;width:min(88vw,360px);text-align:center}
+.box .row button{font-size:34px;padding:6px 0}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{flex:1 1 auto}
+.chips button.on{background:var(--btn);color:var(--btx)}
+.pv{display:flex;border-radius:10px;overflow:hidden;font-size:34px;height:58px}
+.pv div{flex:1;display:grid;place-items:center}
+:root{--gold:#a9801f;--frame:color-mix(in srgb,var(--d) 62%,#000)}
+@media(prefers-color-scheme:dark){:root{--gold:#dcb95f}}
+.brand{display:flex;align-items:center;gap:10px;position:relative;padding:4px 0 14px;cursor:pointer;user-select:none}
+.brand::after{content:"";position:absolute;left:0;right:0;bottom:0;height:8px;border-radius:4px;background:repeating-conic-gradient(var(--l) 0 25%,var(--d) 0 50%) 0 0/16px 16px}
+.kn{display:inline-block;font-size:34px;line-height:1;color:var(--tx)}
+.wm{font:700 30px/1 "Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;letter-spacing:-.02em}
+.wm i{font-weight:400;color:var(--gold)}
+button{transition:transform .12s,background-color .2s}
+button:active:not(:disabled){transform:scale(.96)}
+#bd{margin:5px 0;box-shadow:0 0 0 5px var(--frame),0 14px 26px -10px rgba(0,0,0,.55);border-radius:3px}
+#bd::after{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.14),transparent 45%,rgba(0,0,0,.14));pointer-events:none}
+#bd{position:relative}
+.p,.ck{filter:drop-shadow(0 1.5px 1.5px rgba(0,0,0,.4))}
+.ck{box-shadow:inset 0 0 0 3px rgba(255,255,255,.1),inset 0 -3px 5px rgba(0,0,0,.25)}
+.pl{transition:box-shadow .3s}
+.pl.act{box-shadow:inset 3px 0 0 var(--gold)}
+.sq.chk::before{animation:none}
+#st.fin{color:var(--tx);border:2px solid var(--gold);border-radius:12px;padding:9px;font:700 17px/1.2 "Iowan Old Style",Palatino,Georgia,serif;animation:pop .5s cubic-bezier(.2,.8,.3,1.3)}
+@keyframes pop{from{transform:scale(.7);opacity:0}}
+.rk{font-size:19px}
+.enter #bd .sq>*{animation:drop .5s cubic-bezier(.2,.8,.3,1.2) backwards;animation-delay:calc(var(--i)*9ms)}
+@keyframes drop{from{transform:translateY(-16px) scale(.5);opacity:0}}
+.ov{animation:fade .2s ease-out}.box{animation:pop .28s cubic-bezier(.2,.8,.3,1.3)}
+.clk{flex:none;font:700 20px/1 system-ui,sans-serif;font-variant-numeric:tabular-nums;padding:8px 10px;border-radius:8px;background:rgba(127,127,127,.16);min-width:64px;text-align:center}
+.clk.on{background:var(--btn);color:var(--btx)}
+.clk.low{color:#e5484d}
+.clk.on.low{background:#e5484d;color:#fff}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:6px 0}
+.tiles button{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 4px;border-radius:16px;font-weight:600;background:var(--bg);background:linear-gradient(160deg,color-mix(in srgb,var(--btn) 22%,var(--bg)),var(--bg));border:1px solid color-mix(in srgb,var(--btn) 40%,transparent);transition:transform .15s}
+.tiles button i{font-style:normal;font-size:30px;line-height:1;transition:transform .25s cubic-bezier(.2,.8,.3,1.4)}
+.tiles button:active{transform:scale(.95)}
+.tiles button:active i{transform:scale(1.2) rotate(-8deg)}
+
+/* ---------- Liquid glass (в меру: карточки, вкладки, окна) ---------- */
+:root{--gl1:color-mix(in srgb,var(--tx) 10%,transparent);--gl2:color-mix(in srgb,var(--tx) 3%,transparent);--gb:color-mix(in srgb,var(--tx) 15%,transparent);--gh:color-mix(in srgb,var(--tx) 24%,transparent)}
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(70vmax 46vmax at 0% -8%,rgba(220,185,95,.22),transparent 62%),radial-gradient(60vmax 46vmax at 105% 20%,rgba(60,130,230,.2),transparent 62%),radial-gradient(60vmax 40vmax at 40% 112%,rgba(170,90,220,.14),transparent 62%)}
+.glass,.it,.pl,.ban,#mv,.tabs,.tiles button{background:linear-gradient(135deg,var(--gl1),var(--gl2));-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid var(--gb);box-shadow:inset 0 1px 0 var(--gh),0 10px 26px -16px rgba(0,0,0,.55)}
+.it,.pl,.ban,#mv{border-radius:16px}
+.glass{border-radius:18px}
+.box{background:color-mix(in srgb,var(--bg) 82%,transparent);-webkit-backdrop-filter:blur(22px) saturate(1.6);backdrop-filter:blur(22px) saturate(1.6);border:1px solid var(--gb);box-shadow:inset 0 1px 0 var(--gh),0 24px 60px -20px rgba(0,0,0,.7);border-radius:22px}
+.tabs{padding:4px;gap:4px;border-radius:18px}
+.tabs button{background:transparent;border-radius:14px;padding:10px 2px;font-size:14px}
+.tabs button.on{background:linear-gradient(180deg,rgba(255,255,255,.34),rgba(255,255,255,0) 58%),var(--btn);color:var(--btx);box-shadow:inset 0 1px 0 rgba(255,255,255,.55),0 6px 16px -6px var(--btn)}
+.tiles button{border-radius:18px}
+.gold{color:var(--gold)}
+.bal{flex:none;padding:7px 13px;border-radius:99px;font-weight:700;background:linear-gradient(135deg,var(--gl1),var(--gl2));border:1px solid var(--gb);box-shadow:inset 0 1px 0 var(--gh)}
+/* ---------- премиум: золотая рамка, маленькая корона, цветное имя ---------- */
+.avp{position:relative;flex:none;display:block;width:38px;height:38px}
+.avp::before{content:"";position:absolute;inset:-5px;border-radius:50%;background:conic-gradient(from 210deg,#fff4b8,#f0b93a 18%,#8a5a0c 38%,#ffe27a 55%,#e0a82e 75%,#fff4b8);box-shadow:0 0 0 1px rgba(90,56,0,.9),0 0 12px 1px rgba(255,200,60,.6),inset 0 0 0 1px rgba(255,255,255,.55)}
+.avp .av{position:relative;z-index:1}
+.avp .crn{position:absolute;top:-10px;left:50%;width:13px;height:13px;margin-left:-6.5px;z-index:2;filter:drop-shadow(0 1px 1px rgba(0,0,0,.6))}
+.av.fr{border:3px solid transparent;background:linear-gradient(var(--btn),var(--btn)) padding-box,conic-gradient(from 200deg,var(--f0),var(--f1),var(--f2),var(--f3),var(--f1),var(--f0)) border-box}
+.avp .av.fr{box-shadow:0 0 0 1.5px rgba(70,40,0,.92)}
+.pn{background:linear-gradient(90deg,var(--f3),var(--f1));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+/* ---------- магазин ---------- */
+.sc{padding:12px;display:flex;flex-direction:column;gap:8px;text-align:center}
+.sc b{font-weight:650}
+.sc button{padding:9px 6px}
+.bal2{flex-direction:row;align-items:center;justify-content:space-between;text-align:left}
+.bal2 small{color:var(--hint)}.big{font:700 28px/1.1 system-ui,sans-serif;font-variant-numeric:tabular-nums}
+.bal2 button{flex:none;padding:10px 16px}
+.hero{position:relative;padding:14px 12px 12px;border-radius:22px;overflow:hidden;border:1px solid color-mix(in srgb,var(--gold) 60%,transparent);background:linear-gradient(135deg,rgba(220,185,95,.2),rgba(220,185,95,.04) 60%),linear-gradient(135deg,var(--gl1),var(--gl2));-webkit-backdrop-filter:blur(18px) saturate(1.6);backdrop-filter:blur(18px) saturate(1.6);box-shadow:inset 0 1px 0 rgba(255,235,170,.45),0 0 34px -10px rgba(220,185,95,.55)}
+.hero::before{content:"";position:absolute;top:-60%;left:-30%;width:60%;height:220%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.16),transparent);transform:rotate(8deg);animation:sheen 7s ease-in-out infinite;pointer-events:none}
+@keyframes sheen{0%,55%{transform:translateX(-140%) rotate(8deg)}100%{transform:translateX(480%) rotate(8deg)}}
+.hh{display:flex;align-items:center;gap:10px;margin-bottom:12px;position:relative}
+.hh b{font-size:16px;display:block}.hh small{display:block;color:var(--hint)}
+.crn2{width:28px;height:28px;flex:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))}
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;position:relative}
+.plan{position:relative;display:flex;flex-direction:column;gap:5px;align-items:center;text-align:center;padding:14px 6px 8px;border-radius:16px;background:linear-gradient(135deg,var(--gl1),var(--gl2));border:1px solid var(--gb);box-shadow:inset 0 1px 0 var(--gh)}
+.plan.best{border-color:color-mix(in srgb,var(--gold) 75%,transparent);box-shadow:inset 0 1px 0 rgba(255,235,170,.5),0 0 22px -8px rgba(220,185,95,.7)}
+.plan .pr{font:700 22px/1 system-ui,sans-serif}.plan small{color:var(--hint);font-size:12px}
+.plan button{width:100%;padding:8px 4px;font-size:13px}
+.tagc{position:absolute;top:-9px;left:50%;transform:translateX(-50%);font:700 10px/1 system-ui,sans-serif;padding:4px 8px;border-radius:99px;background:linear-gradient(180deg,#ffe58a,#d9a227);color:#3a2800;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+.fsw{display:flex;gap:6px;margin-top:12px;position:relative}
+.fsw button{padding:5px 0;display:grid;place-items:center;background:transparent}
+.fsw .sw{width:36px;height:36px;border-radius:50%;border:3px solid transparent;display:grid;place-items:center;background:linear-gradient(var(--bg),var(--bg)) padding-box,conic-gradient(from 200deg,var(--f0),var(--f1),var(--f2),var(--f3),var(--f1),var(--f0)) border-box;box-shadow:0 0 10px var(--fg)}
+.fsw .sw.off{background:var(--gl1);border:1px dashed var(--gb);box-shadow:none;color:var(--hint)}
+.fsw .on .sw{outline:2px solid var(--tx);outline-offset:2px}
+.fnote{font-size:12px;color:var(--hint);margin-top:6px;position:relative}
+.shop{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.prv{display:flex;border-radius:12px;overflow:hidden;height:56px}
+.prv>div{flex:1;display:grid;place-items:center;font-size:34px;line-height:1}
+.prv .ck{width:34px;height:34px;font-size:17px}
+.cuep{display:block;height:auto;padding:10px 6px;background:linear-gradient(160deg,#188b50,#0b5832)}
+.cuep svg{display:block}
+.p.sk{display:grid;place-items:center;width:100%;height:100%;font-size:0;filter:drop-shadow(0 1.5px 1.5px rgba(0,0,0,.45)) drop-shadow(0 0 5px var(--sg))}
+.ps{display:block;width:90%;height:90%}
+.box .p.sk{width:48px;height:48px;filter:none}
+.dt .ln{stroke:rgba(0,0,0,.3);stroke-width:1}.dt .ln2{stroke:rgba(0,0,0,.55);stroke-width:1.6}.dt .hl{stroke:rgba(255,255,255,.62);stroke-width:1.7}.dt .eye{fill:rgba(0,0,0,.75);stroke:none}
+.ck.sk{background:radial-gradient(circle at 35% 30%,var(--sl),var(--sm) 55%,var(--sd));border:3px solid var(--sd);color:var(--sk);box-shadow:0 0 10px var(--sg),inset 0 0 0 2px rgba(255,255,255,.2),inset 0 3px 4px rgba(255,255,255,.35),inset 0 -4px 6px rgba(0,0,0,.32)}
+.ck.sk::before{content:"";position:absolute;inset:17%;border-radius:50%;border:2px solid var(--sd);box-shadow:inset 0 0 0 2px rgba(255,255,255,.22),0 0 0 1px rgba(255,255,255,.18);opacity:.8}
+.ck.sk.k::after{position:relative;text-shadow:0 1px 0 rgba(255,255,255,.35)}
+.prv.big{display:block;height:auto}.prv .r{display:flex;height:54px}.prv .r>div{flex:1;display:grid;place-items:center}
+.prv .ps{width:92%;height:92%;filter:drop-shadow(0 1.5px 1.5px rgba(0,0,0,.4))}
+.cuec{display:block;width:100%;height:auto}.cuep{display:flex;flex-direction:column;gap:2px}
+.shop.one{grid-template-columns:1fr}.dsc{color:var(--hint);font-size:12px;line-height:1.25}
+
+.earn{flex:1;text-align:left;margin-left:14px}.earn b{font-size:14px}.earn small{display:block;color:var(--hint);font-size:12px;line-height:1.3;margin-top:2px}
+.don small{color:var(--hint);line-height:1.35;text-align:left}.don .row{margin:0}
+.toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 14px);transform:translateX(-50%);z-index:50;padding:10px 18px;border-radius:99px;font-weight:700;background:linear-gradient(135deg,rgba(220,185,95,.35),rgba(220,185,95,.12)),color-mix(in srgb,var(--bg) 70%,transparent);-webkit-backdrop-filter:blur(18px) saturate(1.6);backdrop-filter:blur(18px) saturate(1.6);border:1px solid color-mix(in srgb,var(--gold) 55%,transparent);box-shadow:inset 0 1px 0 rgba(255,240,180,.5),0 10px 30px -10px rgba(0,0,0,.6);animation:tin .35s cubic-bezier(.2,.8,.3,1.2)}
+.toast.out{opacity:0;transform:translate(-50%,-8px);transition:.5s}
+@keyframes tin{from{opacity:0;transform:translate(-50%,-14px)}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2b0"/><stop offset="1" stop-color="#e0a82e"/></linearGradient><symbol id="crown" viewBox="0 0 24 24"><path d="M3 8l4.6 4.2L12 4l4.4 8.2L21 8l-1.9 11H4.9z" fill="url(#cg)" stroke="#7a5608" stroke-width="1.1" stroke-linejoin="round"/><circle cx="12" cy="3.6" r="1.4" fill="#fff2b0" stroke="#7a5608" stroke-width=".8"/></symbol></defs></svg>
+<div id="app"></div>
+<script>
+// Данные проекта Supabase: Project URL и Publishable key (публичный, secret key сюда нельзя).
+const SB_URL='https://xywwaimphsyeesyblxlj.supabase.co',SB_KEY='sb_publishable_GVx-phI_wuaxWGYYGW1Vfg_a1XAigJB';
+const SND=(n,x)=>{try{Snd.play(n,x)}catch(e){}},sget=k=>{try{return Snd[k]}catch(e){return false}};
+const gst={},lobSt={};let lastTick=0;
+function gsnd(g){
+  const p=gst[g.id];gst[g.id]=g.status;
+  if(p===undefined)return;
+  if(p==='open'&&g.status==='play')SND('start');
+  else if(p==='play'&&g.status==='done'){
+    const col=myCol(g),r=g.result;if(!col||!r)return;
+    const n=r==='d'?'draw':r===col?'win':'lose';
+    setTimeout(()=>SND(n),g.kind==='pool'?1500:350);
+  }
+}
+
+const $=s=>document.querySelector(s),app=$('#app');
+const tgw=window.Telegram&&Telegram.WebApp;
+try{tgw&&(tgw.ready(),tgw.expand())}catch(e){}
+const inTG=!!(tgw&&tgw.initData),TU=(tgw&&tgw.initDataUnsafe&&tgw.initDataUnsafe.user)||null;
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ls=(k,d)=>{try{return localStorage.getItem(k)||d}catch(e){return d}};
+const lset=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
+const msg=t=>inTG&&tgw.showAlert&&tgw.isVersionAtLeast('6.2')?tgw.showAlert(t):alert(t);
+const ask=(q,cb)=>{if(inTG&&tgw.isVersionAtLeast('6.2'))tgw.showConfirm(q,ok=>ok&&cb());else if(confirm(q))cb()};
+let gid=+ls('ch_guest',0);
+if(!TU&&!gid){gid=-Math.floor(Math.random()*1e9)-1;lset('ch_guest',gid)}
+const ME=TU?{id:TU.id,name:TU.first_name,photo:TU.photo_url||null}:{id:gid,name:'Гость '+Math.abs(gid)%1000,photo:null};
+const TH=[['#f0d9b5','#b58863'],['#eeeed2','#769656'],['#dee3e6','#8ca2ad'],['#a7acc4','#4b5170']];
+let th=+ls('ch_th',0)%TH.length,ps=+ls('ch_ps',0)%4,NOTIFY=ls('ch_nt','1')==='1',PR=null,shown={},P={},G=[],GM=null,cur=null,tab='games',rk='chess',vw=null,sel=null,opts=[],RATED=true,db;
+
+/* ---------- шашки (русские) ---------- */
+const D=[[1,1],[1,-1],[-1,1],[-1,-1]],inb=(r,c)=>r>=0&&r<8&&c>=0&&c<8,nm=(r,c)=>'abcdefgh'[c]+(8-r);
+const CI=(()=>{let s='';for(let r=0;r<8;r++)for(let c=0;c<8;c++)s+=(r+c)%2?(r<3?'b':r>4?'w':'.'):'.';return s})();
+const toB=s=>[...Array(8)].map((_,r)=>[...s.slice(r*8,r*8+8)]),fromB=b=>b.map(r=>r.join('')).join('');
+function seqs(b,r,c,side,king){
+  const out=[];
+  for(const[dr,dc]of D){
+    let y=r+dr,x=c+dc;
+    if(king)while(inb(y,x)&&b[y][x]==='.'){y+=dr;x+=dc}
+    if(!inb(y,x))continue;
+    const t=b[y][x];
+    if(t==='.'||t==='x'||t.toLowerCase()===side)continue;
+    const land=[];
+    for(let ly=y+dr,lx=x+dc;inb(ly,lx)&&b[ly][lx]==='.';ly+=dr,lx+=dc){land.push([ly,lx]);if(!king)break}
+    const opts=land.map(([ly,lx])=>{
+      const nb=b.map(a=>a.slice()),k=king||(side==='w'?ly===0:ly===7);
+      nb[y][x]='x';nb[r][c]='.';nb[ly][lx]=k?side.toUpperCase():side;
+      return{ly,lx,sub:seqs(nb,ly,lx,side,k)};
+    });
+    const cont=opts.filter(o=>o.sub.length);
+    for(const o of cont.length?cont:opts){
+      if(o.sub.length)for(const s of o.sub)out.push({path:[[o.ly,o.lx],...s.path],rem:[[y,x],...s.rem]});
+      else out.push({path:[[o.ly,o.lx]],rem:[[y,x]]});
+    }
+  }
+  return out;
+}
+function cmoves(b,side){
+  const caps=[],simp=[];
+  for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+    const p=b[r][c];
+    if(p==='.'||p.toLowerCase()!==side)continue;
+    const king=p!==p.toLowerCase();
+    seqs(b,r,c,side,king).forEach(s=>caps.push({from:[r,c],...s}));
+    if(king){for(const[dr,dc]of D){let y=r+dr,x=c+dc;while(inb(y,x)&&b[y][x]==='.'){simp.push({from:[r,c],path:[[y,x]],rem:[]});y+=dr;x+=dc}}}
+    else{const dr=side==='w'?-1:1;for(const dc of[-1,1]){const y=r+dr,x=c+dc;if(inb(y,x)&&b[y][x]==='.')simp.push({from:[r,c],path:[[y,x]],rem:[]})}}
+  }
+  return caps.length?caps:simp;
+}
+function capply(b,m,side){
+  const nb=b.map(a=>a.slice()),[r,c]=m.from,p=b[r][c],e=m.path[m.path.length-1];
+  nb[r][c]='.';m.rem.forEach(([y,x])=>nb[y][x]='.');
+  const k=p!==p.toLowerCase()||m.path.some(([y])=>side==='w'?y===0:y===7);
+  nb[e[0]][e[1]]=k?side.toUpperCase():side;
+  return nb;
+}
+
+/* ---------- общий слой для обеих игр ---------- */
+const INIT=k=>k==='chess'?new Chess().fen():CI;
+const stAt=(g,i)=>i===0?INIT(g.kind):g.hist[i-1].s;
+const myCol=g=>g.white===ME.id?'w':g.black===ME.id?'b':null;
+function cells(kind,s){
+  if(kind==='chess')return new Chess(s).board().map(r=>r.map(p=>p&&{t:p.type,c:p.color}));
+  return toB(s).map(r=>r.map(p=>p==='.'?null:{c:p.toLowerCase(),k:p!==p.toLowerCase()}));
+}
+function legal(kind,s,side,q){
+  if(kind==='chess')return new Chess(s).moves({square:q,verbose:true}).map(m=>({to:m.to,m}));
+  const out=[];
+  for(const m of cmoves(toB(s),side)){
+    if(nm(...m.from)!==q)continue;
+    const to=nm(...m.path[m.path.length-1]);
+    if(!out.some(o=>o.to===to))out.push({to,m});
+  }
+  return out;
+}
+function applyMove(kind,s,side,o){
+  if(kind==='chess'){
+    const c=new Chess(s),r=c.move({from:o.m.from,to:o.m.to,promotion:o.m.promotion});
+    return{n:r.san,s:c.fen(),f:o.m.from,t:o.m.to,res:c.in_checkmate()?side:(c.in_draw()||c.in_stalemate())?'d':null};
+  }
+  const m=o.m,nb=capply(toB(s),m,side),sep=m.rem.length?':':'-';
+  return{n:[nm(...m.from),...m.path.map(p=>nm(...p))].join(sep),s:fromB(nb),f:nm(...m.from),t:o.to,res:cmoves(nb,side==='w'?'b':'w').length?null:side};
+}
+
+/* ---------- часы ---------- */
+const TCS=[null,[180,2],[300,0],[600,0],[900,10]],TCN=['Без часов','Блиц 3+2','Блиц 5+0','Рапид 10+0','Рапид 15+10'];
+let TC=Math.min(Math.max(+ls('ch_tc',0)||0,0),TCS.length-1),SO=0;
+const nowS=()=>Date.now()+SO,claimed={};
+const clk=g=>{
+  const r={w:g.w_ms,b:g.b_ms};
+  if(g.status==='play'&&nmv(g)>=2&&g.turn_at){const t=nmv(g)%2?'b':'w';r[t]=g[t+'_ms']-(nowS()-Date.parse(g.turn_at))}
+  return r;
+};
+const fmt=ms=>{const s=Math.ceil(Math.max(0,ms)/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+function chk(g){
+  if(!g||g.base==null||g.status!=='play'||nmv(g)<2)return;
+  const t=nmv(g)%2?'b':'w';
+  if(!(clk(g)[t]<=0)||nowS()-(claimed[g.id]||0)<3000)return;
+  claimed[g.id]=nowS();
+  db.rpc('claim_timeout',{gid:g.id}).then(()=>refresh());
+}
+
+/* ---------- данные ----------
+   Как бережём Supabase:
+   1) realtime только по СВОИМ партиям и новым вызовам (а не по всем играм и всем игрокам);
+   2) списки без истории ходов (поле hist тяжёлое), игроки подгружаются только нужные;
+   3) редкий опрос как страховка, он молчит, когда приложение свёрнуто;
+   4) в базу пишем только если что-то изменилось. */
+const PL_RANK='id,name,photo,r_chess,r_dr,r_pool,wins,draws,losses,prem_until,eq,banned';
+const LOB_COLS='id,kind,rated,white,black,status,result,base,inc,draw_by,created_at,n_moves,w_ms,b_ms,turn_at';
+const PT={},RKC={},nmv=g=>g.hist?g.hist.length:(g.n_moves||0);
+let RT=false,rP=null,rAgain=false,pollT=0,lastRef=0,pt=0;
+function toast(t){const d=document.createElement('div');d.className='toast';d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.classList.add('out'),2600);setTimeout(()=>d.remove(),3200)}
+const mergeP=r=>{
+  const old=P[r.id];
+  if(r.id===ME.id&&old&&typeof old.stars==='number'&&typeof r.stars==='number'&&r.stars>old.stars){toast('+'+(r.stars-old.stars)+' ★');SND('promo')}
+  P[r.id]={...old,...r};PT[r.id]=Date.now();
+};
+// подгрузить игроков, которых нет или данные старше 45 с; must: обновить в любом случае
+async function need(ids,must=[]){
+  const now=Date.now(),want=new Set(must.filter(i=>i!=null));
+  for(const i of ids)if(i!=null&&(!P[i]||now-(PT[i]||0)>45000))want.add(i);
+  if(!want.size)return;
+  const r=await db.from('players').select('*').in('id',[...want]);
+  if(r.data)r.data.forEach(mergeP);
+}
+const later=()=>{if(pt)return;pt=setTimeout(()=>{pt=0;paint()},60)};
+function upG(r){
+  const i=G.findIndex(g=>g.id===r.id),keep=(r.status==='open'||r.status==='play')&&(r.status==='open'||myCol(r));
+  if(!keep){if(i>=0)G.splice(i,1);return}
+  if(i>=0)G[i]={...G[i],...r};else G.unshift(r);
+  if(myCol(r)){const p=lobSt[r.id];if(p==='open'&&r.status==='play'&&r.id!==cur)SND('start');lobSt[r.id]=r.status}
+}
+async function loadLobby(){
+  const me=ME.id,since=new Date(Date.now()-864e5).toISOString();
+  const[o,m]=await Promise.all([
+    db.from('games').select(LOB_COLS).eq('status','open').gte('created_at',since).order('created_at',{ascending:false}).limit(40),
+    db.from('games').select(LOB_COLS).or(`white.eq.${me},black.eq.${me}`).in('status',['open','play']).limit(40)
+  ]);
+  if(o.error&&m.error)throw o.error;
+  const seen={},list=[];
+  for(const g of[...(m.data||[]),...(o.data||[])])if(!seen[g.id]){seen[g.id]=1;list.push(g)}
+  list.sort((x,y)=>Date.parse(y.created_at)-Date.parse(x.created_at));
+  G=list;
+  G.forEach(g=>{if(!myCol(g))return;const p=lobSt[g.id];if(p==='open'&&g.status==='play'&&g.id!==cur)SND('start');lobSt[g.id]=g.status;chk(g)});
+  await need(G.flatMap(g=>[g.white,g.black]),[me]);
+}
+async function loadRank(){
+  const k=rk,c=RKC[k];if(c&&Date.now()-c.t<60000)return false;
+  const key=RK[k],r=await db.from('players').select(PL_RANK).order(key,{ascending:false}).order('wins',{ascending:false}).limit(100);
+  if(!r.data)return false;
+  r.data.forEach(mergeP);RKC[k]={t:Date.now(),ids:r.data.map(p=>p.id)};
+  return true;
+}
+async function pollGame(){
+  const id=cur,r=await db.from('games').select('*').eq('id',id).maybeSingle();
+  if(cur!==id||!r.data)return;
+  const g=r.data,was=GM&&GM.status;
+  // не затираем ход, который мы только что сделали и который ещё не успел записаться
+  if(!(GM&&GM.id===id&&GM.status===g.status&&g.hist.length<GM.hist.length))GM=g;
+  await need([g.white,g.black],was&&was!=='done'&&g.status==='done'?[g.white,g.black,ME.id]:[]);
+  paint();
+}
+function refresh(){
+  if(rP){rAgain=true;return rP}
+  lastRef=Date.now();
+  rP=(async()=>{try{if(cur)await pollGame();else{await loadLobby();if(tab==='rank')await loadRank();paint()}}catch(e){}})().finally(()=>{rP=null;if(rAgain){rAgain=false;refresh()}});
+  return rP;
+}
+// редкий опрос: в игре и без realtime чаще, в лобби с realtime совсем редко, в фоне не опрашиваем
+function sched(){
+  clearTimeout(pollT);
+  if(document.hidden)return;
+  const inG=cur&&GM&&GM.status!=='done',ms=(inG?(RT?20000:4000):(RT?45000:15000))*(.85+Math.random()*.3);
+  pollT=setTimeout(async()=>{await refresh();sched()},ms);
+}
+document.addEventListener('visibilitychange',()=>{if(document.hidden)clearTimeout(pollT);else{if(db&&Date.now()-lastRef>5000)refresh();sched()}});
+function onGame(p){
+  if(p.eventType==='DELETE'){const id=p.old&&p.old.id;G=G.filter(g=>g.id!==id);if(cur===id){cur=null;GM=null}return later()}
+  const r=p.new;if(!r)return;
+  upG(r);
+  if(cur===r.id&&(!GM||r.hist.length>=GM.hist.length||r.status!==GM.status)){
+    const was=GM&&GM.status;GM=r;paint();
+    if(was&&was!=='done'&&r.status==='done')need([r.white,r.black],[r.white,r.black,ME.id]).then(later);
+  }else later();
+  need([r.white,r.black]).then(later);
+}
+function connect(){
+  db.channel('u'+ME.id)
+    .on('postgres_changes',{event:'*',schema:'public',table:'games',filter:'white=eq.'+ME.id},onGame)
+    .on('postgres_changes',{event:'*',schema:'public',table:'games',filter:'black=eq.'+ME.id},onGame)
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'games',filter:'status=eq.open'},p=>{if(p.new){upG(p.new);need([p.new.white,p.new.black]).then(later);later()}})
+    .subscribe(st=>{const ok=st==='SUBSCRIBED';if(ok!==RT){RT=ok;sched()}if(ok)refresh()});
+}
+async function init(){
+  db=supabase.createClient(SB_URL,SB_KEY);
+  const sync=async()=>{try{const t0=Date.now(),r=await db.rpc('server_now');if(r.data)SO=Number(r.data)-(t0+Date.now())/2}catch(e){}};
+  await sync();setInterval(()=>{if(!document.hidden)sync()},180000);
+  try{if(inTG&&!ls('ch_wa','')&&tgw.isVersionAtLeast('6.9')&&!(TU&&TU.allows_write_to_pm)){lset('ch_wa','1');tgw.requestWriteAccess()}}catch(e){}
+  // профиль: пишем в базу только новому игроку или если изменились имя/фото
+  let mine=null,isNew=false;
+  try{const r0=await db.from('players').select('*').eq('id',ME.id).maybeSingle();mine=r0.data;isNew=!r0.error&&!r0.data}catch(e){}
+  if(isNew)await db.from('players').upsert({id:ME.id,name:ME.name,photo:ME.photo},{onConflict:'id',ignoreDuplicates:true});
+  else if(mine&&(mine.name!==ME.name||(mine.photo||null)!==(ME.photo||null)))await db.from('players').update({name:ME.name,photo:ME.photo}).eq('id',ME.id);
+  if(mine)mergeP({...mine,name:ME.name,photo:ME.photo});
+  if(isNew&&inTG)fetch('/.netlify/functions/bot',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({initData:tgw.initData,action:'new'})}).catch(()=>{});
+  // цены магазина почти не меняются: храним на час
+  try{
+    let c=null;try{c=JSON.parse(ls('ch_shop','null'))}catch(e){}
+    if(!c||Date.now()-c.t>36e5){const r=await db.from('shop_items').select('*').eq('active',true);if(r.data){c={t:Date.now(),d:r.data};lset('ch_shop',JSON.stringify(c))}}
+    if(c)c.d.forEach(it=>{const s=SHOP[it.id];if(s){s.price=it.price;s.days=it.days;s.give=it.give}});
+  }catch(e){}
+  await refresh();
+  connect();sched();
+}
+async function create(kind){
+  const{data,error}=await db.from('games').insert({kind,rated:RATED,base:TCS[TC]&&kind!=='pool'?TCS[TC][0]:null,inc:TCS[TC]&&kind!=='pool'?TCS[TC][1]:0,[Math.random()<.5?'white':'black']:ME.id}).select();
+  if(error)return msg(/too many/.test(error.message)?'У вас уже 3 открытых вызова. Отмените лишние.':'Ошибка: '+error.message);
+  upG(data[0]);notify(data[0]);openGame(data[0].id,data[0]);
+}
+async function accept(id){
+  const g=G.find(x=>x.id===id);if(!g)return;
+  const{data,error}=await db.from('games').update({[g.white?'black':'white']:ME.id,status:'play'}).eq('id',id).eq('status','open').select();
+  if(error||!data||!data.length){msg('Этот вызов уже недоступен: его принял другой игрок или создатель отменил.');return refresh()}
+  upG(data[0]);GM=data[0];cur=id;vw=null;sel=null;opts=[];SND('start');paint();need([GM.white,GM.black]).then(later);sched();
+}
+async function openGame(id,row){
+  PR=null;cur=id;vw=null;sel=null;opts=[];
+  const k=row||G.find(g=>g.id===id);
+  GM=k&&k.hist?k:null;
+  if(GM)paint();
+  else{
+    const r=await db.from('games').select('*').eq('id',id).maybeSingle();
+    if(cur!==id)return;
+    if(!r.data){cur=null;paint();return refresh()}
+    GM=r.data;
+  }
+  await need([GM.white,GM.black]);
+  if(cur===id)paint();
+  sched();
+}
+function tap(q){
+  const g=GM;if(!g||cur!==g.id)return;
+  const N=g.hist.length,col=myCol(g);
+  if(g.status!=='play'||col!==(N%2?'b':'w')||(vw!==null&&vw!==N))return;
+  const s=stAt(g,N),os=sel?opts.filter(o=>o.to===q):[];
+  if(os.length>1){PR={g,s,col,os};return paint()}
+  if(os.length)return doMove(g,s,col,os[0]);
+  const l=legal(g.kind,s,col,q);
+  if(l.length){sel=q;opts=l}else{sel=null;opts=[]}
+  paint();
+}
+async function doMove(g,s,col,o){
+  const r=applyMove(g.kind,s,col,o),hist=[...g.hist,{n:r.n,s:r.s,f:r.f,t:r.t}];
+  const ex={};
+  if(g.base!=null){const t=g.hist.length%2?'b':'w';ex.turn_at=new Date(nowS()).toISOString();if(g.hist.length>=2)ex[t+'_ms']=Math.max(0,g[t+'_ms']-(nowS()-Date.parse(g.turn_at)))+g.inc*1000}
+  sel=null;opts=[];vw=null;GM={...g,hist,draw_by:null,...ex};paint();
+  const{data:ud,error}=await db.from('games').update({hist,draw_by:null}).eq('id',g.id).select();
+  if(error){if(/time over/.test(error.message)){chk(g);return refresh()}msg('Ход не отправлен: '+error.message);return refresh()}
+  if(ud&&ud[0]&&cur===g.id&&GM&&ud[0].hist.length>=GM.hist.length){GM=ud[0];paint()}
+  if(r.res){await db.rpc('finish_game',{gid:g.id,res:r.res});refresh()}
+}
+const finish=async res=>{await db.rpc('finish_game',{gid:cur,res});refresh()};
+
+/* ---------- экраны ---------- */
+/* ---------- премиум, скины, магазин ---------- */
+const FOREVER=Date.parse('3000-01-01');
+const isPrem=p=>!!(p&&p.prem_until&&Date.parse(p.prem_until)>Date.now());
+const foreverP=p=>!!(p&&p.prem_until&&Date.parse(p.prem_until)>=FOREVER);
+const FRM={gold:{n:'Золото',c:['#fff1b0','#e0a82e','#8a5a0c','#ffe27a']},platinum:{n:'Платина',c:['#ffffff','#b9c3cf','#6c7683','#eef3f9']},rose:{n:'Роза',c:['#ffe0ea','#ff7aa8','#b02a5d','#ffc2d9']},emerald:{n:'Изумруд',c:['#d6ffe6','#3ccf86','#0b6b3d','#9bf0c4']},ice:{n:'Лёд',c:['#ffffff','#7cc8ff','#2a6db3','#bfe4ff']}};
+const FR_ORDER=['gold','platinum','rose','emerald','ice'];
+const frameId=p=>isPrem(p)?(FRM[p.eq&&p.eq.frame]?p.eq.frame:'gold'):null;
+const frameC=p=>FRM[frameId(p)].c;
+const THM={
+  gold:{n:'Золото',d:'Литое золото, гравировка, блеск. Чёрные фигуры в золотой оправе',w:{l:'#fff3bf',m:'#f4cf5c',d:'#7a5608',g:'rgba(255,205,80,.8)'},b:{l:'#a58c4f',m:'#3f3626',d:'#0f0c07',st:'#e2b95a',g:'rgba(255,205,80,.45)'}},
+  ice:{n:'Лёд',d:'Морозный кристалл, холодное сияние',w:{l:'#ffffff',m:'#d3ecff',d:'#3a6fa0',g:'rgba(150,215,255,.85)'},b:{l:'#6f9ee0',m:'#24508f',d:'#0a1d42',g:'rgba(110,175,255,.5)'}},
+  neon:{n:'Неон',d:'Неоновое свечение, яркие грани',w:{l:'#ffd6f5',m:'#ff62d4',d:'#6b0f57',g:'rgba(255,90,215,.85)'},b:{l:'#a8fcff',m:'#25d5f0',d:'#06505f',g:'rgba(50,225,255,.85)'}},
+  ruby:{n:'Рубин',d:'Глубокий рубиновый блеск',w:{l:'#ffdada',m:'#f0606f',d:'#6e0f1c',g:'rgba(255,95,115,.7)'},b:{l:'#8a6470',m:'#33202a',d:'#0c0508',g:'rgba(210,70,100,.4)'}}
+};
+/* ---------- шахматные наборы: собственные SVG-фигуры с металлическим объёмом ---------- */
+const PSHAPES={
+  p:`<circle cx="50" cy="37" r="12.5"/><rect x="37" y="48" width="26" height="8" rx="4"/><path d="M33 77C37 69 43 63 44 55H56C57 63 63 69 67 77Z"/>`,
+  r:`<path d="M32 77L37 44H63L68 77Z"/><rect x="28" y="36" width="44" height="9" rx="3"/><path d="M32 37V16H42V24.5H46.5V16H53.5V24.5H58V16H68V37Z"/>`,
+  b:`<path d="M33 77C38 67 43 59 44 50H56C57 59 62 67 67 77Z"/><rect x="35" y="45" width="30" height="8" rx="4"/><path d="M50 15C62 24 67 34 62 43C59 48 41 48 38 43C33 34 38 24 50 15Z"/><circle cx="50" cy="12" r="4.6"/>`,
+  n:`<path d="M30 77C29 63 34 55 42 48C36 47 31 47 26 43C22 40 22 36 26 33L34 24C35 19 38 15 42 14L43 8L49 13C52 11 55 10 58 11L60 5L65 13C75 20 78 37 73 54C71 62 70 70 70 77Z"/>`,
+  q:`<path d="M32 77C36 67 42 59 43 51H57C58 59 64 67 68 77Z"/><rect x="33" y="46" width="34" height="8" rx="4"/><path d="M34 47L26 22L35 33L38 16L44 32L50 12L56 32L62 16L65 33L74 22L66 47Z"/><circle cx="26" cy="20" r="3.6"/><circle cx="38" cy="14" r="3.6"/><circle cx="50" cy="10" r="3.6"/><circle cx="62" cy="14" r="3.6"/><circle cx="74" cy="20" r="3.6"/>`,
+  k:`<path d="M32 77C36 67 42 59 43 51H57C58 59 64 67 68 77Z"/><rect x="33" y="46" width="34" height="8" rx="4"/><path d="M35 47C33 34 40 27 50 27C60 27 67 34 65 47Z"/><rect x="46" y="6" width="8" height="24" rx="2.4"/><rect x="39" y="12" width="22" height="8" rx="2.4"/>`
+};
+const PDETAIL={
+  p:`<path d="M42 33C43 30 46 28 49 28" class="hl"/><path d="M40 72C43 68 45 64 46 59" class="hl"/><path d="M38 52H62" class="ln"/>`,
+  r:`<path d="M34 41H66" class="ln"/><path d="M36 61H64" class="ln"/><path d="M34 70L36 56" class="hl"/><path d="M34 27V20" class="hl"/>`,
+  b:`<path d="M46 28L57 39" class="ln2"/><path d="M42 36C42 31 44 27 47 23" class="hl"/><path d="M38 49H62" class="ln"/><path d="M40 70C43 66 45 62 46 57" class="hl"/>`,
+  n:`<circle cx="45" cy="29" r="2.4" class="eye"/><path d="M27 37L31 40" class="ln2"/><path d="M62 17C70 25 72 38 69 52" class="ln"/><path d="M58 14C66 22 69 34 66 48" class="ln"/><path d="M36 26C38 23 41 21 44 20" class="hl"/><path d="M35 70C34 63 37 58 41 54" class="hl"/>`,
+  q:`<path d="M37 50H63" class="ln"/><path d="M40 70C43 66 45 62 46 57" class="hl"/><path d="M44 31L50 16L56 31" class="ln"/><path d="M40 33L38 22" class="hl"/>`,
+  k:`<path d="M37 50H63" class="ln"/><path d="M40 70C43 66 45 62 46 57" class="hl"/><path d="M40 38C42 33 45 31 49 30" class="hl"/><path d="M50 22V28" class="ln"/><path d="M41 29C44 33 56 33 59 29" class="ln"/>`
+};
+const PBASE=`<rect x="20" y="83" width="60" height="9" rx="3.6"/><rect x="26" y="76" width="48" height="9" rx="3.6"/>`;
+const PBASED=`<path d="M25 87H75" class="ln"/><path d="M31 80H69" class="ln"/><path d="M24 85C24 85 30 84 36 84" class="hl"/>`;
+const mixc=(a,b,t)=>{const h=s=>[1,3,5].map(i=>parseInt(s.slice(i,i+2),16)),A=h(a),B=h(b);return '#'+A.map((v,i)=>Math.round(v+(B[i]-v)*t).toString(16).padStart(2,'0')).join('')};
+function pieceDefs(THM){
+  let g='';
+  for(const k in PSHAPES){
+    g+=`<g id="pg-${k}">${PBASE}${PSHAPES[k]}</g><symbol id="pc-${k}" viewBox="0 0 100 100"><use href="#pg-${k}"/><use href="#pg-${k}" fill="url(#psh)" stroke="none"/><g fill="none" stroke-linecap="round"><g class="dt">${PBASED}${PDETAIL[k]}</g></g></symbol>`;
+  }
+  let gr='<linearGradient id="psh" gradientUnits="userSpaceOnUse" x1="18" y1="0" x2="82" y2="0"><stop offset="0" stop-color="#000" stop-opacity=".42"/><stop offset=".16" stop-color="#fff" stop-opacity=".34"/><stop offset=".36" stop-color="#fff" stop-opacity="0"/><stop offset=".74" stop-color="#000" stop-opacity=".14"/><stop offset="1" stop-color="#000" stop-opacity=".46"/></linearGradient>';
+  gr+='<symbol id="pc-star" viewBox="-8 -8 16 16"><path d="M0-7L1.6-1.6L7 0L1.6 1.6L0 7L-1.6 1.6L-7 0L-1.6-1.6Z" fill="#fff"/></symbol>';
+  for(const t in THM)for(const c of['w','b']){
+    const s=THM[t][c];
+    gr+=`<linearGradient id="pgr-${t}-${c}" gradientUnits="userSpaceOnUse" x1="22" y1="8" x2="78" y2="92"><stop offset="0" stop-color="${s.l}"/><stop offset=".34" stop-color="${s.m}"/><stop offset=".62" stop-color="${mixc(s.m,s.d,.4)}"/><stop offset=".8" stop-color="${s.m}"/><stop offset="1" stop-color="${s.d}"/></linearGradient>`;
+  }
+  return `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>${gr}${g}</defs></svg>`;
+}
+function pieceSvg(THM,t,k,c){
+  const s=THM[t][c],st=s.st||s.d,glint=t==='gold'?`<use href="#pc-star" x="31" y="${k==='p'?27:k==='n'?16:k==='r'?12:k==='k'||k==='q'?22:20}" width="9" height="9" opacity=".95"/>`:'';
+  return `<svg class="ps" viewBox="0 0 100 100" aria-hidden="true"><use href="#pc-${k}" fill="url(#pgr-${t}-${c})" stroke="${st}" stroke-width="1.8" stroke-linejoin="round"/>${glint}</svg>`;
+}
+
+document.body.insertAdjacentHTML('afterbegin',pieceDefs(THM));
+const SHOP={};
+[['prem_week','premium','Неделя',30,7],['prem_month','premium','Месяц',100,30],['prem_life','premium','Навсегда',400,null]].forEach(([id,kind,label,price,days])=>SHOP[id]={id,kind,label,price,days});
+const SKP={chess:['ch',{gold:150,ice:90,neon:90,ruby:90}],dr:['dr',{gold:120,ice:70,neon:70,ruby:70}],pool:['cue',{gold:150,ice:100,neon:100,ruby:100}]},SKN={chess:'Шахматы',dr:'Шашки',pool:'Кий'};
+for(const k in SKP)for(const t in SKP[k][1]){const id=SKP[k][0]+'_'+t;SHOP[id]={id,kind:k,label:THM[t].n,price:SKP[k][1][t]}}
+const themeOf=id=>String(id).split('_')[1];
+const skinOf=(p,slot)=>{const v=p&&p.eq&&p.eq[slot];return v&&(p.owned||[]).includes(v)?v:null};
+const skStyle=(t,c)=>{const s=THM[t][c];return `--sl:${s.l};--sm:${s.m};--sd:${s.d};--sg:${s.g};--se:${c==='w'?s.d:s.l};--sk:${c==='w'?s.d:s.l}`};
+const cuePal=p=>{const s=skinOf(p,'pool');return s?themeOf(s):null};
+const ckH=(p,sk)=>sk?`<i class="ck sk ${p.c}${p.k?' k':''}" style="${skStyle(themeOf(sk),p.c)}"></i>`:`<i class="ck ${p.c}${p.k?' k':''}"></i>`;
+const itemName=it=>it.kind==='premium'?'Премиум · '+it.label:SKN[it.kind]+' · '+it.label;
+const frs=c=>`--f0:${c[0]};--f1:${c[1]};--f2:${c[2]};--f3:${c[3]};--fg:${c[1]}aa`;
+const av=p=>{
+  const inner=p&&p.photo?`<img src="${esc(p.photo)}" referrerpolicy="no-referrer" alt="">`:esc(((p&&p.name)||'?')[0].toUpperCase());
+  if(!isPrem(p))return `<div class="av">${inner}</div>`;
+  return `<span class="avp"><div class="av fr" style="${frs(frameC(p))}">${inner}</div><svg class="crn" viewBox="0 0 24 24"><use href="#crown"/></svg></span>`;
+};
+const pn=p=>!p?'':isPrem(p)?`<span class="pn" style="${frs(frameC(p))}">${esc(p.name)}</span>`:esc(p.name);
+const KN={chess:'Шахматы',draughts:'Шашки',pool:'Бильярд'},RK={chess:'r_chess',draughts:'r_dr',pool:'r_pool'};
+const rate=(p,k)=>p?p[RK[k]]:'—';
+function paint(){
+  document.documentElement.style.setProperty('--l',TH[th][0]);
+  document.documentElement.style.setProperty('--d',TH[th][1]);
+  if(P[ME.id]&&P[ME.id].banned){app.innerHTML='<div class="ban">Доступ к Chess.meb закрыт администратором.</div>';return}
+  const vk=cur&&GM?'g'+cur:'l'+tab+rk;app.classList.toggle('enter',vk!==paint.k&&vk[0]==='g');paint.k=vk;
+  app.innerHTML=cur&&GM?game():lobby();
+  if(typeof Pool!=='undefined'){Pool.mount();if(tab==='shop'&&!cur)document.querySelectorAll('canvas[data-cue]').forEach(c=>{try{Pool.cueDraw(c)}catch(e){}})}
+  const mv=$('#mv');if(mv&&vw===null)mv.scrollTop=mv.scrollHeight;
+  if(!cur||!GM)PR=null;
+  anim();
+}
+function lobby(){
+  const mine=G.filter(g=>g.white===ME.id||g.black===ME.id),play=mine.filter(g=>g.status==='play'),wait=mine.filter(g=>g.status==='open');
+  const open=G.filter(g=>g.status==='open'&&g.white!==ME.id&&g.black!==ME.id&&Date.now()-Date.parse(g.created_at)<864e5),m=P[ME.id];
+  let h=`<div class="brand" data-a="hop"><span class="kn">♞</span><span class="wm">Chess<i>.meb</i></span></div><div class="top">${av(m||ME)}<div class="n"><b>${pn(m||ME)||esc(ME.name)}</b><small>♚ ${rate(m,'chess')} · ● ${rate(m,'draughts')} · 🎱 ${rate(m,'pool')}</small></div><button class="bal" data-a="tab" data-v="shop" aria-label="Баланс и магазин"><span class="gold">★</span> ${m?m.stars|0:0}</button></div>
+  <div class="row tabs"><button data-a="tab" data-v="games" class="${tab==='games'?'on':''}">Игры</button><button data-a="tab" data-v="rank" class="${tab==='rank'?'on':''}">Рейтинг</button><button data-a="tab" data-v="shop" class="${tab==='shop'?'on':''}">Магазин</button><button data-a="tab" data-v="look" class="${tab==='look'?'on':''}">Вид</button></div>`;
+  if(tab==='look')return h+look();
+  if(tab==='shop')return h+shop();
+  if(tab==='rank'){
+    const key=RK[rk],rc=RKC[rk],list=(rc?rc.ids:[]).map(id=>P[id]).filter(Boolean);
+    if(!rc&&P[ME.id])list.push(P[ME.id]);
+    h+=`<div class="row tabs"><button data-a="rk" data-v="chess" class="${rk==='chess'?'on':''}">Шахматы</button><button data-a="rk" data-v="draughts" class="${rk==='draughts'?'on':''}">Шашки</button><button data-a="rk" data-v="pool" class="${rk==='pool'?'on':''}">Бильярд</button></div>`;
+    h+=list.map((p,i)=>`<div class="it ${p.id===ME.id?'me':''}"><div class="rk">${['🥇','🥈','🥉'][i]||i+1}</div>${av(p)}<div class="n"><b>${pn(p)}</b><small>${p.wins} поб. · ${p.draws} ничьих · ${p.losses} пор.</small></div><b>${p[key]}</b></div>`).join('')||'<div class="ban">Пока никого нет</div>';
+    if(list.length>=100)h+='<small style="color:var(--hint);text-align:center;display:block">Показаны 100 лучших</small>';
+    return h;
+  }
+  h+=`<h4>Новая партия</h4><div class="chips" style="margin-bottom:6px">${TCN.map((x,i)=>`<button data-a="tc" data-v="${i}" class="${i===TC?'on':''}">${x}</button>`).join('')}</div><div class="tiles"><button data-a="new" data-v="chess"><i>♚</i>Шахматы</button><button data-a="new" data-v="draughts"><i>⛀</i>Шашки</button><button data-a="new" data-v="pool"><i>🎱</i>Бильярд</button></div><small style="opacity:.6">Часы работают в шахматах и шашках</small>
+  <label class="rt"><input type="checkbox" id="rt" ${RATED?'checked':''}> На рейтинг</label>
+  <label class="rt"><input type="checkbox" id="nt" ${NOTIFY?'checked':''}> Позвать других игроков (бот напишет им)</label>`;
+  const row=(g,btn)=>{
+    const oid=g.white===ME.id?g.black:g.white,o=P[oid];
+    return `<div class="it">${av(o)}<div class="n"><b>${KN[g.kind]}${g.base==null?'':' · '+g.base/60+'+'+g.inc}${g.rated?'':' · дружеская'}</b><small>${o?pn(o)+' · '+rate(o,g.kind):oid?'…':'Ждёт соперника'}</small></div>${btn}</div>`;
+  };
+  if(play.length)h+='<h4>Мои партии</h4>'+play.map(g=>row(g,`<button class="pri" data-a="open" data-v="${g.id}">${(myCol(g)===(nmv(g)%2?'b':'w'))?'Ваш ход':'Открыть'}</button>`)).join('');
+  if(wait.length)h+='<h4>Ждут соперника</h4>'+wait.map(g=>row(g,`<button data-a="open" data-v="${g.id}">Открыть</button>`)).join('');
+  h+='<h4>Открытые вызовы</h4>'+(open.map(g=>row(g,`<button class="pri" data-a="accept" data-v="${g.id}">Играть</button>`)).join('')||'<div class="ban">Пока нет вызовов. Создайте свой, и соперник увидит его сразу.</div>');
+  return h;
+}
+function game(){
+  if(GM.kind==='pool')return typeof Pool==='undefined'?'<div class="ban">Не загрузился pool.js. Проверьте, что он лежит на GitHub рядом с index.html.</div><div class="row"><button class="pri" data-a="back">Лобби</button></div>':Pool.view();
+  const g=GM,N=g.hist.length,v=vw===null?N:Math.min(vw,N),s=stAt(g,v),col=myCol(g),flip=col==='b',turn=N%2?'b':'w';
+  const live=v===N,can=g.status==='play'&&live&&col===turn,last=v>0?g.hist[v-1]:null,cl=cells(g.kind,s);
+  let ksq='';if(g.kind==='chess'){const cc=new Chess(s);if(cc.in_check())for(let r=0;r<8;r++)for(let c=0;c<8;c++){const p=cl[r][c];if(p&&p.t==='k'&&p.c===cc.turn())ksq=nm(r,c)}}
+  const sl=g.kind==='chess'?'chess':'dr',skW=skinOf(P[g.white],sl),skB=skinOf(P[g.black],sl);
+  let b='';
+  for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+    const rr=flip?7-r:r,cc=flip?7-c:c,q=nm(rr,cc),p=cl[rr][cc];
+    let k='sq '+((rr+cc)%2?'d':'l');
+    if(last&&(last.f===q||last.t===q))k+=' lm';
+    if(can&&sel===q)k+=' sel';
+    if(ksq===q)k+=' chk';
+    if(can&&opts.some(o=>o.to===q))k+=p?' cp':' mv';
+    const pc=!p?'':g.kind==='chess'?pcs(p,p.c==='w'?skW:skB):ckH(p,p.c==='w'?skW:skB);
+    b+=`<div class="${k}" data-sq="${q}" style="--i:${r*8+c}">${pc}</div>`;
+  }
+  const card=c=>{const p=P[c==='w'?g.white:g.black];return `<div class="pl ${g.status==='play'&&turn===c?'act':''}">${av(p)}<div class="n"><b>${p?pn(p):'Ждём соперника…'}</b><small>${KN[g.kind]} ${rate(p,g.kind)} · ${c==='w'?'белые':'чёрные'}</small></div>${g.base!=null?`<span class="clk${g.status==='play'&&g.hist.length>=2&&turn===c?' on':''}${clk(g)[c]<20000?' low':''}" data-clk="${c}">${fmt(clk(g)[c])}</span>`:''}</div>`};
+  let st;
+  if(g.status==='open')st='Ждём соперника…';
+  else if(g.status==='done')st=(g.result==='d'?'Ничья':g.result==='w'?'Белые победили':'Чёрные победили')+(g.rated?'. Рейтинг обновлён.':'.');
+  else if(!live)st=`Просмотр: ход ${v} из ${N}`;
+  else st=(col?(can?'Ваш ход':'Ход соперника'):'Ход '+(turn==='w'?'белых':'чёрных'))+(g.kind==='chess'&&new Chess(s).in_check()?' · шах':'');
+  let ban='';
+  if(g.status==='open'&&col)ban=`<div class="ban"><button data-a="cancel">Отменить вызов</button></div>`;
+  if(g.status==='play'&&g.draw_by&&col)ban=g.draw_by===col?'<div class="ban">Вы предложили ничью</div>':'<div class="ban">Соперник предлагает ничью<div class="row"><button class="pri" data-a="dyes">Принять</button><button data-a="dno">Отклонить</button></div></div>';
+  let m='';
+  g.hist.forEach((x,i)=>{if(i%2===0)m+=`<em>${i/2+1}.</em>`;m+=`<span data-a="goto" data-v="${i+1}" class="${v===i+1?'cur':''}">${esc(x.n)}</span>`});
+  const off=g.status!=='play'||!col?'disabled':'';
+  return `${card(flip?'w':'b')}<div id="bd">${b}</div>${card(flip?'b':'w')}<div id="st" class="${g.status==='open'?'wait':g.status==='done'?'fin':''}">${st}</div>${ban}
+  <div class="row"><button data-a="prev" ${v===0?'disabled':''} aria-label="Ход назад">◀</button><button data-a="next" ${live?'disabled':''} aria-label="Ход вперёд">▶</button><button data-a="draw" ${off}>Ничья</button><button data-a="resign" ${off}>Сдаться</button><button class="pri" data-a="back">Лобби</button></div>
+  <div id="mv">${m||'<em>Ходов пока нет</em>'}</div>${PR?promoHTML():''}`;
+}
+
+const BN=['Дерево','Зелёная','Синяя','Ночная'],PS=['Классика','Контур','Буквы','Цветные'];
+function pcs(p,sk){
+  const i='kqrbnp'.indexOf(p.t);
+  if(sk)return `<i class="p sk ${p.c}" style="${skStyle(themeOf(sk),p.c)}">${pieceSvg(THM,themeOf(sk),p.t,p.c)}</i>`;
+  if(ps===2)return `<i class="p let ${p.c}">${p.t.toUpperCase()}</i>`;
+  const o=ps===1&&p.c==='w';
+  return `<i class="p ${o?'o ':''}${ps===3?'col ':''}${p.c}">${(o?'♔♕♖♗♘♙':'♚♛♜♝♞♟')[i]}\uFE0E</i>`;
+}
+function look(){
+  const pv=['k','q','r','b','n','p'].map((t,i)=>`<div style="background:${TH[th][i%2]}">${pcs({t,c:i%2?'b':'w'})}</div>`).join('');
+  const chips=(a,L,on)=>`<div class="chips">${L.map((x,i)=>`<button data-a="${a}" data-v="${i}" class="${i===on?'on':''}">${x}</button>`).join('')}</div>`;
+  return `<div class="pv">${pv}</div><h4>Доска</h4>${chips('th',BN,th)}<h4>Фигуры в шахматах</h4>${chips('ps',PS,ps)}<h4>Уведомления</h4><label class="rt"><input type="checkbox" id="nm" ${P[ME.id]&&P[ME.id].notify===false?'':'checked'}> Получать сообщения от бота о вызовах</label><h4>Звук</h4><label class="rt"><input type="checkbox" id="sn" ${sget('on')?'checked':''}> Звуки в играх</label><label class="rt"><input type="checkbox" id="sv" ${sget('vib')?'checked':''}> Вибрация</label><h4>Поддержать проект</h4><div class="sc glass don"><small>Игра бесплатна и такой останется. Если хочется помочь развитию, можно отправить звёзды Telegram. Это необязательно и ничего не даёт взамен.</small><div class="row">${[10,50,100].map(n=>`<button data-a="don" data-v="${n}"><span class="gold">★</span> ${n}</button>`).join('')}</div></div>`;
+}
+function promoHTML(){
+  return `<div class="ov"><div class="box"><b>Превратить пешку в:</b><div class="row" style="margin:10px 0">${['q','r','b','n'].map(t=>`<button data-a="promo" data-v="${t}">${pcs({t,c:PR.col},skinOf(P[ME.id],'chess'))}</button>`).join('')}</div><button data-a="pcancel" style="width:100%">Отмена</button></div></div>`;
+}
+function notify(g){
+  if(!NOTIFY||!inTG)return;
+  fetch('/.netlify/functions/notify',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({initData:tgw.initData,kind:g.kind,rated:g.rated})}).catch(()=>{});
+}
+function slide(f,t,rev){
+  const bd=$('#bd');
+  if(!bd||matchMedia('(prefers-reduced-motion:reduce)').matches)return;
+  const z=bd.clientWidth/8,flip=myCol(GM)==='b';
+  const xy=q=>{const c='abcdefgh'.indexOf(q[0]),r=8-q[1];return[flip?7-c:c,flip?7-r:r]};
+  const[fx,fy]=xy(f),[tx,ty]=xy(t),el=$(`[data-sq="${rev?f:t}"]`),pc=el&&el.firstElementChild;
+  if(!pc)return;
+  pc.style.zIndex=5;
+  pc.animate([{transform:`translate(${(rev?tx-fx:fx-tx)*z}px,${(rev?ty-fy:fy-ty)*z}px)`},{transform:'none'}],{duration:260,easing:'cubic-bezier(.2,.7,.3,1)'});
+}
+const fin={},calm=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
+function confetti(){
+  if(calm())return;
+  const c=['🎉','✨','♞','👑','⭐'];
+  for(let i=0;i<26;i++){
+    const e=document.createElement('i');e.textContent=c[i%5];
+    e.style.cssText=`position:fixed;left:${Math.random()*96}vw;top:-30px;font-style:normal;font-size:${16+Math.random()*16}px;z-index:30;pointer-events:none`;
+    document.body.appendChild(e);
+    e.animate([{transform:'translateY(0) rotate(0)'},{transform:`translateY(${innerHeight+60}px) rotate(${Math.random()*720-360}deg)`}],{duration:1800+Math.random()*1400,delay:Math.random()*400,easing:'cubic-bezier(.3,.1,.5,1)',fill:'backwards'}).onfinish=()=>e.remove();
+  }
+}
+function hop(b){
+  const k=b.firstElementChild;if(!k||calm())return;
+  k.animate([{transform:'none'},{transform:'translate(0,-18px) rotate(-10deg)',offset:.35},{transform:'translate(16px,-18px) rotate(10deg)',offset:.6},{transform:'none'}],{duration:560,easing:'ease-out'});
+}
+function anim(){
+  const g=GM;if(!cur||!g)return;
+  gsnd(g);
+  if(g.kind==='pool')return;
+  const N=g.hist.length,v=vw===null?N:Math.min(vw,N),pv=shown[g.id];
+  shown[g.id]=v;
+  if(g.status==='done'&&v===N&&!fin[g.id]){fin[g.id]=1;if(pv!==undefined&&myCol(g)===g.result)confetti()}
+  if(pv===undefined||Math.abs(v-pv)!==1)return;
+  const rev=v<pv,e=g.hist[rev?v:v-1];
+  slide(e.f,e.t,rev);
+  if(rev)return;
+  if(g.kind==='draughts'){const up=t=>(t.match(/[A-Z]/g)||[]).length,pr=g.hist[v-2]?g.hist[v-2].s:INIT('draughts');SND(up(e.s)>up(pr)?'dking':/[x:]/.test(e.n)?'dcapture':'dmove')}
+  else SND(e.n.includes('=')?'promo':/[x:]/.test(e.n)?'capture':'move');
+  if(e.n.endsWith('+'))setTimeout(()=>SND('check'),160);
+  const end=$(`[data-sq="${e.t}"]`);
+  if(/[x:]/.test(e.n)&&end)end.classList.add('burst');
+  if(g.kind!=='chess')return;
+  const m=/^O-O(-O)?/.exec(e.n);
+  if(m){const k=e.t[1];slide(m[1]?'a'+k:'h'+k,m[1]?'d'+k:'f'+k,false)}
+  if(e.n.includes('=')&&end&&end.firstElementChild)end.firstElementChild.animate([{transform:'scale(.3)'},{transform:'scale(1.25)',offset:.6},{transform:'scale(1)'}],{duration:380});
+  if(e.n.endsWith('#'))$('#bd').animate([{transform:'translateX(0)'},{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'translateX(-4px)'},{transform:'translateX(0)'}],{duration:420});
+}
+
+setInterval(()=>{
+  const g=GM;if(!cur||!g||g.base==null)return;
+  const c=clk(g),live=g.status==='play'&&g.hist.length>=2,t=g.hist.length%2?'b':'w';
+  for(const s of['w','b']){const e=$(`[data-clk="${s}"]`);if(!e)continue;const v=fmt(c[s]);if(e.textContent!==v)e.textContent=v;e.classList.toggle('on',live&&s===t);e.classList.toggle('low',c[s]<20000)}
+  if(live&&myCol(g)===t&&c[t]>0&&c[t]<10000){const s=Math.ceil(c[t]/1000);if(s!==lastTick){lastTick=s;SND('tick')}}
+  chk(g);
+},250);
+
+/* ---------- магазин ---------- */
+let BUSY=false;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const myStars=()=>{const m=P[ME.id];return m?m.stars|0:0};
+async function api(action,extra){
+  if(!inTG)throw new Error('Магазин работает внутри Telegram. Откройте игру через бота.');
+  const r=await fetch('/.netlify/functions/bot',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({initData:tgw.initData,action,...extra})});
+  const j=await r.json().catch(()=>({}));
+  if(!j.ok)throw new Error(j.error||'Не получилось. Попробуйте ещё раз.');
+  return j;
+}
+function skPrev(k,t){
+  if(k==='pool')return `<div class="prv cuep"><canvas class="cuec" data-cue="${t}" data-z="0"></canvas><canvas class="cuec" data-cue="${t}" data-z="1"></canvas></div>`;
+  if(k==='chess'){const row=(c,o)=>['k','q','n'].map((p,i)=>`<div style="background:${(i+o)%2?'#b58863':'#f0d9b5'}">${pieceSvg(THM,t,p,c)}</div>`).join('');return `<div class="prv big"><div class="r">${row('w',0)}</div><div class="r">${row('b',1)}</div></div>`}
+  const man=(c,kg,bg)=>`<div style="background:${bg}"><i class="ck sk ${c}${kg?' k':''}" style="${skStyle(t,c)}"></i></div>`;
+  return `<div class="prv">${man('w',0,'#f0d9b5')}${man('b',0,'#b58863')}${man('w',1,'#f0d9b5')}${man('b',1,'#b58863')}</div>`;
+}
+function shop(){
+  const m=P[ME.id]||{},pm=isPrem(m),fv=foreverP(m),own=m.owned||[],eq=m.eq||{};
+  let h=inTG?'':'<div class="ban">Магазин работает только внутри Telegram. Откройте игру через бота.</div>';
+  h+=`<div class="sc glass bal2"><div><small>Ваши звёзды</small><div class="big"><span class="gold">★</span> ${myStars()}</div></div><div class="earn"><b>Как заработать</b><small>Победа в рейтинговой партии: шахматы +4, шашки и бильярд +3, ничья +1. До 20 ★ в день.</small></div></div>`;
+  const ttl=fv?'Премиум навсегда':pm?'Премиум до '+new Date(m.prem_until).toLocaleDateString('ru-RU'):'Премиум';
+  const PL=[['prem_week','7 дней',''],['prem_month','30 дней','Выгодно'],['prem_life','один раз','Лучший']];
+  h+=`<div class="hero"><div class="hh"><svg class="crn2" viewBox="0 0 24 24" aria-hidden="true"><use href="#crown"/></svg><div><b>${ttl}</b><small>${pm?'Золотая рамка, корона и цветное имя видны всем':'Золотая рамка, корона и цветное имя: все увидят, что вы с премиумом'}</small></div></div>
+  <div class="plans">${PL.map(([id,sub,tag])=>{const it=SHOP[id];return `<div class="plan${id==='prem_life'?' best':''}">${tag?`<span class="tagc">${tag}</span>`:''}<b>${it.label}</b><div class="pr"><span class="gold">★</span> ${it.price}</div><small>${sub}</small><button class="${id==='prem_life'?'pri':''}" data-a="buy" data-v="${id}" ${fv?'disabled':''}>${pm&&id!=='prem_life'?'Продлить':'Получить'}</button></div>`}).join('')}</div>
+  <div class="fsw">${FR_ORDER.map(f=>`<button data-a="equip" data-v="frame:${f}" ${pm?'':'disabled'} class="${(FRM[eq.frame]?eq.frame:'gold')===f?'on':''}" aria-label="${FRM[f].n}"><span class="sw" style="${frs(FRM[f].c)}"></span></button>`).join('')}</div>
+  <div class="fnote">${pm?'Золотая рамка и корона показывают всем, что у вас премиум. Цвет внутреннего кольца можно выбрать.':'С премиумом у аватара появится золотая рамка и корона, а цвет внутреннего кольца можно выбрать.'}</div></div>`;
+  for(const k of ['chess','dr','pool']){
+    h+=`<h4>${k==='chess'?'Шахматные наборы':k==='dr'?'Шашки':'Кии'}</h4><div class="shop${k==='pool'?' one':''}">`+Object.keys(THM).map(t=>{
+      const id=SKP[k][0]+'_'+t,it=SHOP[id],has=own.includes(id),on=eq[k]===id;
+      const dsc=k==='pool'&&typeof Pool!=='undefined'&&Pool.CUES[t]?Pool.CUES[t].d:THM[t].d;
+      return `<div class="sc glass">${skPrev(k,t)}<b>${THM[t].n}</b><span class="dsc">${dsc}</span>${has?`<button data-a="equip" data-v="${k}:${on?'':id}" class="${on?'pri':''}">${on?'Взято':'Взять'}</button>`:`<button data-a="buy" data-v="${id}"><span class="gold">★</span> ${it.price} · Получить</button>`}</div>`;
+    }).join('')+'</div>';
+  }
+  return h+'<small style="color:var(--hint);text-align:center">Платных функций нет: всё получается за звёзды, заработанные победами. Премиум и скины меняют только внешний вид, их видят и соперники.</small>';
+}
+// Единственная оплата в игре: добровольное пожертвование звёздами Telegram, взамен ничего не выдаётся
+function donate(n){
+  if(!inTG)return msg('Пожертвовать можно внутри Telegram. Откройте игру через бота.');
+  ask(`Отправить ${n} ★ на развитие проекта? Это добровольно и ничего не даёт взамен.`,async()=>{
+    if(BUSY)return;BUSY=true;
+    try{
+      const{link}=await api('donate',{amount:n});BUSY=false;
+      if(tgw.openInvoice&&tgw.isVersionAtLeast('6.1'))tgw.openInvoice(link,st=>{if(st==='paid')msg('Спасибо за поддержку проекта!');else if(st==='failed')msg('Оплата не прошла.')});
+      else tgw.openTelegramLink(link);
+    }catch(e){BUSY=false;msg(e.message)}
+  });
+}
+async function spend(id){
+  if(BUSY)return;BUSY=true;
+  try{await api('buy',{item:id});SND('promo');await refresh()}catch(e){msg(e.message)}
+  BUSY=false;
+}
+function buy(id){
+  const it=SHOP[id],m=P[ME.id]||{};if(!it)return;
+  if(!inTG)return msg('Магазин работает внутри Telegram. Откройте игру через бота.');
+  if(it.kind==='premium'&&foreverP(m))return msg('У вас уже премиум навсегда.');
+  if(myStars()<it.price)return msg(`Не хватает звёзд: нужно ${it.price} ★, у вас ${myStars()} ★. Звёзды дают за победы в рейтинговых партиях.`);
+  ask(`Взять «${itemName(it)}» за ${it.price} ★?`,()=>spend(id));
+}
+async function equip(slot,id){
+  if(BUSY)return;
+  try{
+    await api('equip',{slot,item:id});
+    const m=P[ME.id];if(m){m.eq={...(m.eq||{})};if(id)m.eq[slot]=id;else delete m.eq[slot]}
+    paint();refresh();
+  }catch(e){msg(e.message)}
+}
+
+/* ---------- события ---------- */
+app.onclick=async e=>{
+  const q=e.target.closest('[data-sq]');if(q)return tap(q.dataset.sq);
+  const b=e.target.closest('[data-a]');if(!b||b.disabled)return;
+  const a=b.dataset.a,v=b.dataset.v,g=GM,col=g&&myCol(g);
+  if(a==='hop')hop(b);
+  else if(a==='tab'){tab=v;paint();if(v==='rank')loadRank().then(ch=>ch&&tab==='rank'&&!cur&&paint())}
+  else if(a==='rk'){rk=v;paint();loadRank().then(ch=>ch&&rk===v&&tab==='rank'&&!cur&&paint())}
+  else if(a==='tc'){TC=+v;lset('ch_tc',TC);paint()}
+  else if(a==='th'){th=+v;lset('ch_th',th);paint()}
+  else if(a==='ps'){ps=+v;lset('ch_ps',ps);paint()}
+  else if(a==='promo'){const{g:pg,s:psn,col:pcol,os}=PR,o=os.find(o=>o.m.promotion===v);PR=null;if(o)doMove(pg,psn,pcol,o);else paint()}
+  else if(a==='pcancel'){PR=null;sel=null;opts=[];paint()}
+  else if(a==='buy')buy(v);
+  else if(a==='equip'){const k=v.indexOf(':');equip(v.slice(0,k),v.slice(k+1))}
+  else if(a==='don')donate(+v);
+  else if(a==='new')create(v);
+  else if(a==='open')openGame(v);
+  else if(a==='accept')accept(v);
+  else if(a==='back'){cur=null;GM=null;paint();refresh();sched()}
+  else if(a==='prev'||a==='next'){const N=g.hist.length,c=vw===null?N:vw;vw=Math.max(0,Math.min(N,c+(a==='next'?1:-1)));if(vw===N)vw=null;sel=null;opts=[];paint()}
+  else if(a==='goto'){vw=+v>=g.hist.length?null:+v;sel=null;opts=[];paint()}
+  else if(a==='draw')await db.from('games').update({draw_by:col}).eq('id',cur);
+  else if(a==='dno')await db.from('games').update({draw_by:null}).eq('id',cur);
+  else if(a==='dyes')finish('d');
+  else if(a==='resign')ask('Сдаться?',()=>finish(col==='w'?'b':'w'));
+  else if(a==='cancel'){const id=cur;await db.from('games').delete().eq('id',id);G=G.filter(x=>x.id!==id);cur=null;GM=null;paint();refresh()}
+};
+app.onchange=e=>{if(e.target.id==='rt')RATED=e.target.checked;if(e.target.id==='nt'){NOTIFY=e.target.checked;lset('ch_nt',NOTIFY?1:0)}if(e.target.id==='sn')try{Snd.set('on',e.target.checked)}catch(x){}if(e.target.id==='sv')try{Snd.set('vib',e.target.checked)}catch(x){}if(e.target.id==='nm')db.from('players').update({notify:e.target.checked}).eq('id',ME.id).then(()=>refresh())};
+
+if(SB_URL.includes('ВСТАВЬТЕ'))app.innerHTML='<div class="ban">Откройте index.html на GitHub, нажмите на карандаш и вставьте адрес проекта Supabase и ключ anon в начале скрипта.</div>';
+else init();
+</script>
+</body>
+</html>
