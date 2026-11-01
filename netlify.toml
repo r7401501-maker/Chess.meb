@@ -1,8 +1,0 @@
-[build]
-  publish = "."
-  functions = "netlify/functions"
-
-# Публичные значения (URL и публичный ключ Supabase) лежат в index.html, так и задумано.
-# Без этой строки защита Netlify от утечек секретов может счесть их секретами и остановить публикацию.
-[build.environment]
-  SECRETS_SCAN_OMIT_KEYS = "SUPABASE_URL,SUPABASE_KEY,APP_LINK"
